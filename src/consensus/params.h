@@ -25,6 +25,11 @@ struct Params {
     int64_t nPowTargetSpacing;
     int64_t nPowTargetTimespan;
     int64_t DifficultyAdjustmentInterval() const { return nPowTargetTimespan / nPowTargetSpacing; }
+    
+    /** Auxpow parameters */
+    int16_t nAuxpowChainId;
+    bool fStrictChainId;
+    int nStartAuxPow;
 };
 } // namespace Consensus
 

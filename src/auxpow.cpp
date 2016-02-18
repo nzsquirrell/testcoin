@@ -91,8 +91,8 @@ int CMerkleTx::GetBlocksToMaturity() const
 {
     if (!IsCoinBase())
         return 0;
-    int nCoinbaseMaturity = Params().GetConsensus(chainActive.Height()).nCoinbaseMaturity;
-    return std::max(0, (nCoinbaseMaturity + 1) - GetDepthInMainChain());
+    //int nCoinbaseMaturity = Params().GetConsensus(chainActive.Height()).nCoinbaseMaturity;
+    return std::max(0, (COINBASE_MATURITY+1) - GetDepthInMainChain());
 }
 
 

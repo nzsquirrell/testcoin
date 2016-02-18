@@ -6,7 +6,7 @@
 #include "primitives/pureheader.h"
 
 #include "chainparams.h"
-#include "crypto/scrypt.h"
+#include "crypto/hashskein.h"
 #include "hash.h"
 #include "utilstrencodings.h"
 
@@ -17,7 +17,5 @@ uint256 CPureBlockHeader::GetHash() const
 
 uint256 CPureBlockHeader::GetPoWHash() const
 {
-    uint256 thash;
-    scrypt_1024_1_1_256(BEGIN(nVersion), BEGIN(thash));
-    return thash;
+    return HashSkein(BEGIN(nVersion), END(nNonce));
 }

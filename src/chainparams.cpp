@@ -40,6 +40,11 @@ public:
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = false;
+        // Allow AuxPow blocks from this height
+        consensus.nStartAuxPow = 0;
+        consensus.nAuxpowChainId = 0x0123; // 98 - Josh Wise!
+        consensus.fStrictChainId = false;
+        
         /** 
          * The message start string is designed to be unlikely to occur in normal data.
          * The characters are rarely used upper ASCII, not valid as UTF-8, and produce
