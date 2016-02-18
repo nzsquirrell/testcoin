@@ -11,7 +11,7 @@
 #include "uint256.h"
 #include "util.h"
 
-unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
+unsigned int GetNextWorkRequiredBTC(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
     unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
 
@@ -49,6 +49,65 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
 
     return CalculateNextWorkRequired(pindexLast, pindexFirst->GetBlockTime(), params);
 }
+
+unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
+{
+    int64_t nTargetSpacing = 60;  // 60 seconds per block
+    int64_t nAveragingInterval = 10; // 10 blocks
+    int64_t nAveragingTargetTimespan = nAveragingInterval * nTargetSpacing; // 600 seconds, 10 minutes
+    int64_t nMaxAdjustDown = 4; // 4% adjustment down
+    int64_t nMaxAdjustUp = 4; // 4% adjustment up
+    
+    int64_t nMinActualTimespan = nAveragingTargetTimespan * (100 - nMaxAdjustUp) / 100;
+    int64_t nMaxActualTimespan = nAveragingTargetTimespan * (100 + nMaxAdjustDown) / 100;
+    
+    const arith_uint256 nProofOfWorkLimit = UintToArith256(params.powLimit);
+
+    // Genesis block
+    if (pindexLast == NULL)
+        return nProofOfWorkLimit.GetCompact();
+
+    const CBlockIndex* pindexFirst = pindexLast;
+
+    // Go back by what we want to be nAveragingInterval blocks
+    for (int i = 0; pindexFirst && i < nAveragingInterval - 1; i++)
+    {
+        pindexFirst = pindexFirst->pprev;
+        if (pindexFirst == NULL)
+        {
+            return nProofOfWorkLimit.GetCompact();
+        }
+    }
+    
+    int64_t nActualTimespan = pindexLast->GetMedianTimePast() - pindexFirst->GetMedianTimePast();
+    
+    LogPrintf("  nActualTimespan = %d before bounds   %d   %d\n", nActualTimespan, pindexLast->GetBlockTime(), pindexFirst->GetBlockTime());
+    
+    if (nActualTimespan < nMinActualTimespan)
+        nActualTimespan = nMinActualTimespan;
+    if (nActualTimespan > nMaxActualTimespan)
+        nActualTimespan = nMaxActualTimespan;
+    
+    LogPrintf("  nActualTimespan = %d after bounds   %d   %d\n", nActualTimespan, nMinActualTimespan, nMaxActualTimespan);
+    
+    arith_uint256 bnNew;
+    arith_uint256 bnOld;
+    bnNew.SetCompact(pindexLast->nBits);
+    bnOld = bnNew;
+    bnNew *= nActualTimespan;
+    bnNew /= nAveragingTargetTimespan;
+    if (bnNew > nProofOfWorkLimit)
+        bnNew = nProofOfWorkLimit;
+    
+    /// debug print
+    LogPrintf("GetNextWorkRequired RETARGET\n");
+    LogPrintf("nTargetTimespan = %d    nActualTimespan = %d\n", nAveragingTargetTimespan, nActualTimespan);
+    LogPrintf("Before: %08x  %s\n", pindexLast->nBits, bnOld.ToString());
+    LogPrintf("After:  %08x  %s\n", bnNew.GetCompact(), bnNew.ToString());
+
+    return bnNew.GetCompact();
+}
+
 
 unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nFirstBlockTime, const Consensus::Params& params)
 {
