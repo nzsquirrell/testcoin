@@ -134,6 +134,17 @@ public:
     uint64_t GetHash(const uint256& salt) const;
 };
 
+/** 512-bit opaque blob.
+ * @note This type is called uint512 for historical reasons only. It is an opaque
+ * blob of 512 bits and has no integer operations.
+ */
+class uint512 : public base_blob<512> {
+public:
+    uint512() {}
+    uint512(const base_blob<512>& b) : base_blob<512>(b) {}
+    explicit uint512(const std::vector<unsigned char>& vch) : base_blob<512>(vch) {}
+};
+
 /* uint256 from const char *.
  * This is a separate function because the constructor uint256(const char*) can result
  * in dangerously catching uint256(0).
