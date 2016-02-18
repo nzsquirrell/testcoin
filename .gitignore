@@ -1,12 +1,12 @@
 *.tar.gz
 
 *.exe
-src/bitcoin
-src/bitcoind
-src/bitcoin-cli
-src/bitcoin-tx
-src/test/test_bitcoin
-src/qt/test/test_bitcoin-qt
+src/testcoin
+src/testcoind
+src/testcoin-cli
+src/testcoin-tx
+src/test/test_testcoin
+src/qt/test/test_testcoin-qt
 
 # autoreconf
 Makefile.in
