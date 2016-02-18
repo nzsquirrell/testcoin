@@ -551,6 +551,132 @@ void static BitcoinMiner(CWallet *pwallet)
     }
 }
 
+void static GenericMiner(CWallet *pwallet)
+{
+    // Each thread has its own key and counter
+    CReserveKey reservekey(pwallet);
+    unsigned int nExtraNonce = 0;
+    const CChainParams& chainparams = Params();
+    
+    while(true)
+    {
+/*        if (chainparams.MiningRequiresPeers()) {
+            // Busy-wait for the network to come online so we don't waste time mining
+            // on an obsolete chain. In regtest mode we expect to fly solo.
+            do {
+                bool fvNodesEmpty;
+                {
+                    LOCK(cs_vNodes);
+                    fvNodesEmpty = vNodes.empty();
+                }
+                if (!fvNodesEmpty && !IsInitialBlockDownload())
+                    break;
+                MilliSleep(1000);
+            } while (true);
+        }*/
+
+        //
+        // Create new block
+        //
+        unsigned int nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
+        CBlockIndex* pindexPrev = chainActive.Tip();
+
+        auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey));
+        if (!pblocktemplate.get())
+        {
+            LogPrintf("Error in TestcoinMiner: Keypool ran out, please call keypoolrefill before restarting the mining thread\n");
+            return;
+        }
+        CBlock *pblock = &pblocktemplate->block;
+        IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
+
+        LogPrintf("Running generic miner with %u transactions in block (%u bytes)\n",
+               pblock->vtx.size(),
+               ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION));
+
+        //
+        // Search
+        //
+        int64_t nStart = GetTime();
+        arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
+        LogPrintf("TestcoinMiner target hash: %s\n", hashTarget.GetHex());
+        uint256 hash;
+        while(true)
+        {
+            hash = pblock->GetPoWHash();
+            if (UintToArith256(hash) <= hashTarget){
+                SetThreadPriority(THREAD_PRIORITY_NORMAL);
+                LogPrintf("TestcoinMiner:\n");
+                LogPrintf("proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex(), hashTarget.GetHex());
+                ProcessBlockFound(pblock, *pwallet, reservekey);
+                SetThreadPriority(THREAD_PRIORITY_LOWEST);
+                
+                // In regression test mode, stop mining after a block is found.
+                if (chainparams.MineBlocksOnDemand())
+                    throw boost::thread_interrupted();
+                
+                break;
+            }
+            ++pblock->nNonce;
+
+            // Check for stop or if block needs to be rebuilt
+            boost::this_thread::interruption_point();
+            // Regtest mode doesn't require peers
+            if (vNodes.empty() && chainparams.MiningRequiresPeers())
+                break;
+            if (pblock->nNonce >= 0xffff0000)
+                break;
+            if (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 60)
+                break;
+            if (pindexPrev != chainActive.Tip())
+                break;
+
+            // Update nTime every few seconds
+            UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
+            if (chainparams.GetConsensus().fPowAllowMinDifficultyBlocks)
+            {
+                // Changing pblock->nTime can change work required on testnet:
+                hashTarget.SetCompact(pblock->nBits);
+            }
+        }
+    }
+}
+
+void static ThreadMiner(CWallet *pwallet)
+{
+    LogPrintf("Testcoin miner started\n");
+    SetThreadPriority(THREAD_PRIORITY_LOWEST);
+    RenameThread("bitcoin-miner");
+
+    try
+    {
+/*        switch (miningAlgo)
+        {
+            case ALGO_SHA256D:
+                BitcoinMiner(pwallet);
+                break;
+            case ALGO_SCRYPT:
+                ScryptMiner(pwallet);
+                break;
+            case ALGO_GROESTL:
+                GenericMiner(pwallet, ALGO_GROESTL);
+                break;
+            case ALGO_SKEIN:
+                GenericMiner(pwallet, ALGO_SKEIN);
+                break;
+            case ALGO_QUBIT:
+                GenericMiner(pwallet, ALGO_QUBIT);
+                break;
+        }*/
+        GenericMiner(pwallet);
+    }
+    catch (boost::thread_interrupted)
+    {
+        LogPrintf("Testcoin miner terminated\n");
+        throw;
+    }
+}
+
 void GenerateBitcoins(bool fGenerate, CWallet* pwallet, int nThreads)
 {
     static boost::thread_group* minerThreads = NULL;
@@ -575,7 +701,7 @@ void GenerateBitcoins(bool fGenerate, CWallet* pwallet, int nThreads)
 
     minerThreads = new boost::thread_group();
     for (int i = 0; i < nThreads; i++)
-        minerThreads->create_thread(boost::bind(&BitcoinMiner, pwallet));
+        minerThreads->create_thread(boost::bind(&ThreadMiner, pwallet));
 }
 
 #endif // ENABLE_WALLET

@@ -9,11 +9,18 @@
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 #include "crypto/common.h"
+#include "crypto/hashskein.h"
 
 uint256 CBlockHeader::GetHash() const
 {
     return SerializeHash(*this);
 }
+
+uint256 CBlockHeader::GetPoWHash() const
+{
+    return HashSkein(BEGIN(nVersion), END(nNonce));
+}
+
 
 uint256 CBlock::BuildMerkleTree(bool* fMutated) const
 {
