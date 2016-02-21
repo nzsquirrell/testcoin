@@ -221,6 +221,11 @@ public:
         return block.GetPoWHash();
     }
 
+    int GetAlgo() const
+    {
+        return ::GetAlgo(nVersion.GetFullVersion());
+    }
+    
     int64_t GetBlockTime() const
     {
         return (int64_t)nTime;

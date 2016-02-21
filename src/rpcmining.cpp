@@ -150,7 +150,7 @@ Value generate(const Array& params, bool fHelp)
     Array blockHashes;
     while (nHeight < nHeightEnd)
     {
-        auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey));
+        auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey, miningAlgo));
         if (!pblocktemplate.get())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Wallet keypool empty");
         CBlock *pblock = &pblocktemplate->block;
@@ -252,10 +252,17 @@ Value getmininginfo(const Array& params, bool fHelp)
     obj.push_back(Pair("blocks",           (int)chainActive.Height()));
     obj.push_back(Pair("currentblocksize", (uint64_t)nLastBlockSize));
     obj.push_back(Pair("currentblocktx",   (uint64_t)nLastBlockTx));
-    obj.push_back(Pair("difficulty",       (double)GetDifficulty()));
+    obj.push_back(Pair("pow_algo_id",        miningAlgo));
+    obj.push_back(Pair("pow_algo",           GetAlgoName(miningAlgo)));
+    obj.push_back(Pair("difficulty",         (double)GetDifficulty(NULL, miningAlgo)));
+    obj.push_back(Pair("difficulty_sha256d", (double)GetDifficulty(NULL, ALGO_SHA256D)));
+    obj.push_back(Pair("difficulty_scrypt",  (double)GetDifficulty(NULL, ALGO_SCRYPT)));
+    obj.push_back(Pair("difficulty_groestl", (double)GetDifficulty(NULL, ALGO_GROESTL)));
+    obj.push_back(Pair("difficulty_skein",   (double)GetDifficulty(NULL, ALGO_SKEIN)));
+    obj.push_back(Pair("difficulty_qubit",   (double)GetDifficulty(NULL, ALGO_QUBIT)));
     obj.push_back(Pair("errors",           GetWarnings("statusbar")));
     obj.push_back(Pair("genproclimit",     (int)GetArg("-genproclimit", -1)));
-    obj.push_back(Pair("networkhashps",    getnetworkhashps(params, false)));
+//    obj.push_back(Pair("networkhashps",    getnetworkhashps(params, false)));
     obj.push_back(Pair("pooledtx",         (uint64_t)mempool.size()));
     obj.push_back(Pair("testnet",          Params().TestnetToBeDeprecatedFieldRPC()));
     obj.push_back(Pair("chain",            Params().NetworkIDString()));
@@ -507,7 +514,7 @@ Value getblocktemplate(const Array& params, bool fHelp)
             pblocktemplate = NULL;
         }
         CScript scriptDummy = CScript() << OP_TRUE;
-        pblocktemplate = CreateNewBlock(scriptDummy);
+        pblocktemplate = CreateNewBlock(scriptDummy, miningAlgo);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
@@ -808,7 +815,7 @@ Value getauxblockbip22(const Array& params, bool fHelp)
             }
 
             // Create new block with nonce = 0 and extraNonce = 1
-            pblocktemplate = CreateNewBlockWithKey(reservekey);
+            pblocktemplate = CreateNewBlockWithKey(reservekey, miningAlgo);
             if (!pblocktemplate)
                 throw JSONRPCError(RPC_OUT_OF_MEMORY, "out of memory");
 

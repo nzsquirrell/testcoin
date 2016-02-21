@@ -36,13 +36,14 @@ public:
         consensus.nMajorityEnforceBlockUpgrade = 750;
         consensus.nMajorityRejectBlockOutdated = 950;
         consensus.nMajorityWindow = 1000;
-        consensus.powLimit = uint256S("0000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        consensus.powLimit = uint256S("000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
-        consensus.nPowTargetSpacing = 10 * 60;
+        consensus.nPowTargetSpacing = 60; // target time for block spacing across all algorithms
+        consensus.nAveragingInterval = 10; // number of blocks to take the timespan of
         consensus.fPowAllowMinDifficultyBlocks = false;
         // Allow AuxPow blocks from this height
         consensus.nStartAuxPow = 0;
-        consensus.nAuxpowChainId = 0x0123; // 98 - Josh Wise!
+        consensus.nAuxpowChainId = 0x0123; 
         consensus.fStrictChainId = false;
         
         /** 
@@ -82,14 +83,14 @@ public:
         genesis.hashMerkleRoot = genesis.BuildMerkleTree();
         genesis.nVersion = 1;
         genesis.nTime    = 1455597574;
-        genesis.nBits    = 0x1e0fffff;
-        genesis.nNonce   = 1434119;
+        genesis.nBits    = 0x1e00ffff;
+        genesis.nNonce   = 10297460;
 
         consensus.hashGenesisBlock = genesis.GetHash();
         
         // If genesis block hash does not match, then generate new genesis hash.
         
-        uint256 tmphashGenesisBlock = uint256S("0xb519bb2dd76860028f90b06ec7035467f9a48dea48d105a1d9f339bc778b17c3");
+        uint256 tmphashGenesisBlock = uint256S("0x0000005ac460a35bd47163c9360164d3b746ea593cfcece55467ddd72bdbf4ec");
         if (true && genesis.GetHash() != tmphashGenesisBlock)
         {
             printf("Searching for genesis block...\n");
@@ -123,7 +124,7 @@ public:
             printf("genesis.hashMerkleRoot = %s\n", genesis.BuildMerkleTree().ToString().c_str());
         }
         
-        assert(consensus.hashGenesisBlock == uint256S("0xb519bb2dd76860028f90b06ec7035467f9a48dea48d105a1d9f339bc778b17c3"));
+        assert(consensus.hashGenesisBlock == uint256S("0x0000005ac460a35bd47163c9360164d3b746ea593cfcece55467ddd72bdbf4ec"));
         assert(genesis.hashMerkleRoot == uint256S("0xa1c37dfaac8ac852263a658ab7024bd52954a748c9b149b0aec5c3193c1c34ab"));
 
         vSeeds.push_back(CDNSSeedData("testcoin.local", "seed.testcoin.local"));
@@ -177,12 +178,12 @@ public:
 
         //! Modify the testnet genesis block so the timestamp is valid for a later start.
         genesis.nTime = 1455597594;
-        genesis.nNonce = 856768;
+        genesis.nNonce = 10195322;
         consensus.hashGenesisBlock = genesis.GetHash();
         
         // If genesis block hash does not match, then generate new genesis hash.
         
-        uint256 tmphashGenesisBlock = uint256S("0xca8e01ba2dc3200766d4dc33283e941d0a902eee7ec364f70e477923a213e115");
+        uint256 tmphashGenesisBlock = uint256S("0x000000b4d8f062c4a99e60cc78c707c05a77404dc23a62c8d6ad69c010d7990d");
         if (true && genesis.GetHash() != tmphashGenesisBlock)
         {
             printf("Searching for Testnet genesis block...\n");
@@ -216,7 +217,7 @@ public:
             printf("genesis.hashMerkleRoot = %s\n", genesis.BuildMerkleTree().ToString().c_str());
         }
         
-        assert(consensus.hashGenesisBlock == uint256S("0xca8e01ba2dc3200766d4dc33283e941d0a902eee7ec364f70e477923a213e115"));
+        assert(consensus.hashGenesisBlock == uint256S("0x000000b4d8f062c4a99e60cc78c707c05a77404dc23a62c8d6ad69c010d7990d"));
 
         vFixedSeeds.clear();
         vSeeds.clear();
@@ -268,13 +269,13 @@ public:
         nMinerThreads = 1;
         genesis.nTime = 1455597514;
         genesis.nBits = 0x207fffff;
-        genesis.nNonce = 0;
+        genesis.nNonce = 1;
         consensus.hashGenesisBlock = genesis.GetHash();
         nDefaultPort = 18444;
         
         // If genesis block hash does not match, then generate new genesis hash.
         
-        uint256 tmphashGenesisBlock = uint256S("0xd64af1e5d810601d1513a45d75a47c73d031b5d97805143c14f648bb5e92d5f1");
+        uint256 tmphashGenesisBlock = uint256S("0x0f9d37fc985f596ccb1480607294ef35c872e4a921990d9ce27807c8c5c43676");
         if (true && genesis.GetHash() != tmphashGenesisBlock)
         {
             printf("Searching for Regtest genesis block...\n");
@@ -308,7 +309,7 @@ public:
             printf("genesis.hashMerkleRoot = %s\n", genesis.BuildMerkleTree().ToString().c_str());
         }
         
-        assert(consensus.hashGenesisBlock == uint256S("0xd64af1e5d810601d1513a45d75a47c73d031b5d97805143c14f648bb5e92d5f1"));
+        assert(consensus.hashGenesisBlock == uint256S("0x0f9d37fc985f596ccb1480607294ef35c872e4a921990d9ce27807c8c5c43676"));
         nPruneAfterHeight = 1000;
 
         vFixedSeeds.clear(); //! Regtest mode doesn't have any fixed seeds.

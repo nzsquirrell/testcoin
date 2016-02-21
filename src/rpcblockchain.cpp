@@ -3,6 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "chainparams.h"
 #include "checkpoints.h"
 #include "consensus/validation.h"
 #include "core_io.h"
@@ -22,22 +23,33 @@ using namespace std;
 extern void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry);
 void ScriptPubKeyToJSON(const CScript& scriptPubKey, Object& out, bool fIncludeHex);
 
-double GetDifficulty(const CBlockIndex* blockindex)
+double GetDifficulty(const CBlockIndex* blockindex, int algo)
 {
+    unsigned int nBits;
+    unsigned int powLimit = UintToArith256(Params().GetConsensus().powLimit).GetCompact();
     // Floating point number that is a multiple of the minimum difficulty,
     // minimum difficulty = 1.0.
     if (blockindex == NULL)
     {
         if (chainActive.Tip() == NULL)
-            return 1.0;
+            nBits = powLimit;
         else
-            blockindex = chainActive.Tip();
+        {
+            //blockindex = chainActive.Tip();
+            blockindex = GetLastBlockIndexForAlgo(chainActive.Tip(), algo);
+            if (blockindex == NULL)
+                nBits = powLimit;
+            else
+                nBits = blockindex->nBits;
+        }   
     }
+    else
+        nBits = blockindex->nBits;
 
-    int nShift = (blockindex->nBits >> 24) & 0xff;
+    int nShift = (nBits >> 24) & 0xff;
 
     double dDiff =
-        (double)0x0000ffff / (double)(blockindex->nBits & 0x00ffffff);
+        (double)0x0000ffff / (double)(nBits & 0x00ffffff);
 
     while (nShift < 29)
     {
@@ -94,6 +106,9 @@ Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDe
     result.push_back(Pair("size", (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION)));
     result.push_back(Pair("height", blockindex->nHeight));
     result.push_back(Pair("version", block.nVersion.GetFullVersion()));
+    int algo = block.GetAlgo();
+    result.push_back(Pair("pow_algo_id", algo));
+    result.push_back(Pair("pow_algo", GetAlgoName(algo)));
     result.push_back(Pair("pow_hash", block.GetPoWHash().GetHex()));
     result.push_back(Pair("merkleroot", block.hashMerkleRoot.GetHex()));
     Array txs;
@@ -112,7 +127,7 @@ Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDe
     result.push_back(Pair("time", block.GetBlockTime()));
     result.push_back(Pair("nonce", (uint64_t)block.nNonce));
     result.push_back(Pair("bits", strprintf("%08x", block.nBits)));
-    result.push_back(Pair("difficulty", GetDifficulty(blockindex)));
+    result.push_back(Pair("difficulty", GetDifficulty(blockindex, miningAlgo)));
     result.push_back(Pair("chainwork", blockindex->nChainWork.GetHex()));
 
     if (block.auxpow)
@@ -175,7 +190,7 @@ Value getdifficulty(const Array& params, bool fHelp)
         );
 
     LOCK(cs_main);
-    return GetDifficulty();
+    return GetDifficulty(NULL, miningAlgo);
 }
 
 
@@ -528,7 +543,7 @@ Value getblockchaininfo(const Array& params, bool fHelp)
     obj.push_back(Pair("blocks",                (int)chainActive.Height()));
     obj.push_back(Pair("headers",               pindexBestHeader ? pindexBestHeader->nHeight : -1));
     obj.push_back(Pair("bestblockhash",         chainActive.Tip()->GetBlockHash().GetHex()));
-    obj.push_back(Pair("difficulty",            (double)GetDifficulty()));
+    obj.push_back(Pair("difficulty",            (double)GetDifficulty(NULL, miningAlgo)));
     obj.push_back(Pair("verificationprogress",  Checkpoints::GuessVerificationProgress(Params().Checkpoints(), chainActive.Tip())));
     obj.push_back(Pair("chainwork",             chainActive.Tip()->nChainWork.GetHex()));
     obj.push_back(Pair("pruned",                fPruneMode));

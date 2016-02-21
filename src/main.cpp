@@ -2103,8 +2103,8 @@ void static UpdateTip(CBlockIndex *pindexNew) {
     nTimeBestReceived = GetTime();
     mempool.AddTransactionsUpdated(1);
 
-    LogPrintf("%s: new best=%s  height=%d  log2_work=%.8g  tx=%lu  date=%s progress=%f  cache=%.1fMiB(%utx)\n", __func__,
-      chainActive.Tip()->GetBlockHash().ToString(), chainActive.Height(), log(chainActive.Tip()->nChainWork.getdouble())/log(2.0), (unsigned long)chainActive.Tip()->nChainTx,
+    LogPrintf("%s: new best=%s height=%d algo=%d log2_work=%.8g tx=%lu date=%s progress=%f cache=%.1fMiB(%utx)\n", __func__,
+      chainActive.Tip()->GetBlockHash().ToString(), chainActive.Height(), chainActive.Tip()->GetAlgo(), log(chainActive.Tip()->nChainWork.getdouble())/log(2.0), (unsigned long)chainActive.Tip()->nChainTx,
       DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
       Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), chainActive.Tip()), pcoinsTip->DynamicMemoryUsage() * (1.0 / (1<<20)), pcoinsTip->GetCacheSize());
 
@@ -2766,6 +2766,7 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
     assert(pindexPrev);
 
     int nHeight = pindexPrev->nHeight+1;
+    int algo = GetAlgo(block.nVersion.GetFullVersion());
 
     // Disallow AuxPow blocks before it is activated.
     if (nHeight < consensusParams.nStartAuxPow
@@ -2775,7 +2776,7 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
                          REJECT_INVALID, "early-auxpow-block");
                          
     // Check proof of work
-    if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
+    if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams, algo))
         return state.DoS(100, error("%s: incorrect proof of work at height %d", __func__, nHeight),
                          REJECT_INVALID, "bad-diffbits");
 

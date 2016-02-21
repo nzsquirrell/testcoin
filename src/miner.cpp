@@ -87,10 +87,13 @@ void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, 
 
     // Updating time can change work required on testnet:
     if (consensusParams.fPowAllowMinDifficultyBlocks)
-        pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, consensusParams);
+    {
+        int algo = pblock->GetAlgo();
+        pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, consensusParams, algo);
+    }
 }
 
-CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
+CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn, int algo)
 {
     const CChainParams& chainparams = Params();
     // Create new block
@@ -102,7 +105,8 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
     /* Initialise the block version.  */
     pblock->nVersion = CBlockHeader::CURRENT_VERSION;
     pblock->nVersion.SetChainId(chainparams.GetConsensus().nAuxpowChainId);
-
+    pblock->nVersion.SetAlgo(algo);
+    
     // -regtest only: allow overriding block.nVersion with
     // -blockversion=N to test forking scenarios
     if (Params().MineBlocksOnDemand())
@@ -335,7 +339,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         // Fill in header
         pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
         UpdateTime(pblock, Params().GetConsensus(), pindexPrev);
-        pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, Params().GetConsensus());
+        pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, Params().GetConsensus(), algo);
         pblock->nNonce         = 0;
         pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
 
@@ -405,14 +409,14 @@ bool static ScanHash(const CBlockHeader *pblock, uint32_t& nNonce, uint256 *phas
     }
 }
 
-CBlockTemplate* CreateNewBlockWithKey(CReserveKey& reservekey)
+CBlockTemplate* CreateNewBlockWithKey(CReserveKey& reservekey, int algo)
 {
     CPubKey pubkey;
     if (!reservekey.GetReservedKey(pubkey))
         return NULL;
 
     CScript scriptPubKey = CScript() << ToByteVector(pubkey) << OP_CHECKSIG;
-    return CreateNewBlock(scriptPubKey);
+    return CreateNewBlock(scriptPubKey, algo);
 }
 
 static bool ProcessBlockFound(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
@@ -478,7 +482,7 @@ void static BitcoinMiner(CWallet *pwallet)
             unsigned int nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
             CBlockIndex* pindexPrev = chainActive.Tip();
 
-            auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey));
+            auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey, ALGO_SHA256D));
             if (!pblocktemplate.get())
             {
                 LogPrintf("Error in BitcoinMiner: Keypool ran out, please call keypoolrefill before restarting the mining thread\n");
@@ -555,7 +559,7 @@ void static BitcoinMiner(CWallet *pwallet)
     }
 }
 
-void static GenericMiner(CWallet *pwallet)
+void static GenericMiner(CWallet *pwallet, int algo)
 {
     // Each thread has its own key and counter
     CReserveKey reservekey(pwallet);
@@ -585,7 +589,7 @@ void static GenericMiner(CWallet *pwallet)
         unsigned int nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
         CBlockIndex* pindexPrev = chainActive.Tip();
 
-        auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey));
+        auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlockWithKey(reservekey, algo));
         if (!pblocktemplate.get())
         {
             LogPrintf("Error in TestcoinMiner: Keypool ran out, please call keypoolrefill before restarting the mining thread\n");
@@ -654,13 +658,14 @@ void static ThreadMiner(CWallet *pwallet)
 
     try
     {
-/*        switch (miningAlgo)
+        switch (miningAlgo)
         {
             case ALGO_SHA256D:
                 BitcoinMiner(pwallet);
                 break;
             case ALGO_SCRYPT:
-                ScryptMiner(pwallet);
+                //ScryptMiner(pwallet);
+                BitcoinMiner(pwallet);
                 break;
             case ALGO_GROESTL:
                 GenericMiner(pwallet, ALGO_GROESTL);
@@ -671,8 +676,7 @@ void static ThreadMiner(CWallet *pwallet)
             case ALGO_QUBIT:
                 GenericMiner(pwallet, ALGO_QUBIT);
                 break;
-        }*/
-        GenericMiner(pwallet);
+        }
     }
     catch (boost::thread_interrupted)
     {

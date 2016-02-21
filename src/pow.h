@@ -15,8 +15,8 @@ class CBlockIndex;
 class uint256;
 class arith_uint256;
 
-unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params&);
-unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nFirstBlockTime, const Consensus::Params&);
+unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params&, int algo);
+unsigned int CalculateNextWorkRequiredV1(const CBlockIndex* pindexPrev, const CBlockIndex* pindexFirst, const Consensus::Params& params, int algo);
 
 /** Check whether a block hash satisfies the proof-of-work requirement specified by nBits */
 bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params&);
@@ -32,5 +32,8 @@ bool CheckAuxPowProofOfWork(const CBlockHeader& block, const Consensus::Params& 
 
 /** Return the time it would take to redo the work difference between from and to, assuming the current hashrate corresponds to the difficulty at tip, in seconds. */
 int64_t GetBlockProofEquivalentTime(const CBlockIndex& to, const CBlockIndex& from, const CBlockIndex& tip, const Consensus::Params&);
+
+const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, int algo);
+const CBlockIndex* GetLastBlockIndexForAlgo(const CBlockIndex* pindex, int algo);
 
 #endif // BITCOIN_POW_H
