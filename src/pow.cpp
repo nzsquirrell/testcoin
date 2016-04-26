@@ -7,6 +7,7 @@
 
 #include "arith_uint256.h"
 #include "chain.h"
+#include "chainparams.h"
 #include "primitives/block.h"
 #include "uint256.h"
 #include "util.h"
@@ -100,37 +101,6 @@ unsigned int CalculateNextWorkRequiredV1(const CBlockIndex* pindexPrev, const CB
 }
 
 
-/*unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nFirstBlockTime, const Consensus::Params& params)
-{
-    // Limit adjustment step
-    int64_t nActualTimespan = pindexLast->GetBlockTime() - nFirstBlockTime;
-    LogPrintf("  nActualTimespan = %d  before bounds\n", nActualTimespan);
-    if (nActualTimespan < params.nPowTargetTimespan/4)
-        nActualTimespan = params.nPowTargetTimespan/4;
-    if (nActualTimespan > params.nPowTargetTimespan*4)
-        nActualTimespan = params.nPowTargetTimespan*4;
-
-    // Retarget
-    const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
-    arith_uint256 bnNew;
-    arith_uint256 bnOld;
-    bnNew.SetCompact(pindexLast->nBits);
-    bnOld = bnNew;
-    bnNew *= nActualTimespan;
-    bnNew /= params.nPowTargetTimespan;
-
-    if (bnNew > bnPowLimit)
-        bnNew = bnPowLimit;
-
-    /// debug print
-    LogPrintf("GetNextWorkRequired RETARGET\n");
-    LogPrintf("params.nPowTargetTimespan = %d    nActualTimespan = %d\n", params.nPowTargetTimespan, nActualTimespan);
-    LogPrintf("Before: %08x  %s\n", pindexLast->nBits, bnOld.ToString());
-    LogPrintf("After:  %08x  %s\n", bnNew.GetCompact(), bnNew.ToString());
-
-    return bnNew.GetCompact();
-}*/
-
 bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params& params)
 {
     bool fNegative;
@@ -192,6 +162,117 @@ int GetAlgoWorkFactor(int algo)
         default:
             return 1;
     }
+}
+
+arith_uint256 GetPrevWorkForAlgo(const CBlockIndex& block, int algo)
+{
+    const CBlockIndex* pindex = &block;
+    while (pindex != NULL)
+    {
+        if (pindex->GetAlgo() == algo)
+        {
+            return GetBlockProofBase(*pindex);
+        }
+        pindex = pindex->pprev;
+    }
+    return UintToArith256(Params().GetConsensus().powLimit);
+}
+
+arith_uint256 GetPrevWorkForAlgoWithDecay(const CBlockIndex& block, int algo)
+{
+    int nDistance = 0;
+    arith_uint256 nWork;
+    const CBlockIndex* pindex = &block;
+    while (pindex != NULL)
+    {
+        if (nDistance > 32)
+        {
+            return UintToArith256(Params().GetConsensus().powLimit);
+        }
+        if (pindex->GetAlgo() == algo)
+        {
+            arith_uint256 nWork = GetBlockProofBase(*pindex);
+            nWork *= (32 - nDistance);
+            nWork /= 32;
+            if (nWork < UintToArith256(Params().GetConsensus().powLimit))
+                nWork = UintToArith256(Params().GetConsensus().powLimit);
+            return nWork;
+        }
+        pindex = pindex->pprev;
+        nDistance++;
+    }
+    return UintToArith256(Params().GetConsensus().powLimit);
+}
+
+arith_uint256 GetPrevWorkForAlgoWithDecay2(const CBlockIndex& block, int algo)
+{
+    int nDistance = 0;
+    arith_uint256 nWork;
+    const CBlockIndex* pindex = &block;
+    while (pindex != NULL)
+    {
+        if (nDistance > 32)
+        {
+            return arith_uint256(0);
+        }
+        if (pindex->GetAlgo() == algo)
+        {
+            arith_uint256 nWork = GetBlockProofBase(*pindex);
+            nWork *= (32 - nDistance);
+            nWork /= 32;
+            return nWork;
+        }
+        pindex = pindex->pprev;
+        nDistance++;
+    }
+    return arith_uint256(0);
+}
+    
+arith_uint256 GetPrevWorkForAlgoWithDecay3(const CBlockIndex& block, int algo)
+{
+    int nDistance = 0;
+    arith_uint256 nWork;
+    const CBlockIndex* pindex = &block;
+    while (pindex != NULL)
+    {
+        if (nDistance > 100)
+        {
+            return arith_uint256(0);
+        }
+        if (pindex->GetAlgo() == algo)
+        {
+            arith_uint256 nWork = GetBlockProofBase(*pindex);
+            nWork *= (100 - nDistance);
+            nWork /= 100;
+            return nWork;
+        }
+        pindex = pindex->pprev;
+        nDistance++;
+    }
+    return arith_uint256(0);
+}
+
+arith_uint256 GetGeometricMeanPrevWork(const CBlockIndex& block)
+{
+    arith_uint256 bnRes;
+    arith_uint256 nBlockWork = GetBlockProofBase(block);
+    int nAlgo = block.GetAlgo();
+    
+    for (int algo = 0; algo < NUM_ALGOS; algo++)
+    {
+        if (algo != nAlgo)
+        {
+            arith_uint256 nBlockWorkAlt = GetPrevWorkForAlgoWithDecay3(block, algo);
+            if (nBlockWorkAlt != 0)
+                nBlockWork *= nBlockWorkAlt;
+        }
+    }
+    bnRes = nBlockWork;
+    // Compute the geometric mean
+    bnRes = nthRoot(bnRes, NUM_ALGOS);
+    // Scale to roughly match the old work calculation
+    bnRes <<= 8;
+    return bnRes;
 }
 
 arith_uint256 GetBlockProof(const CBlockIndex& block)
@@ -294,3 +375,93 @@ const CBlockIndex* GetLastBlockIndexForAlgo(const CBlockIndex* pindex, int algo)
     }
 }
 
+int BN_cmp(arith_uint256 a, arith_uint256 b)
+{
+    if(a < b)
+        return -1;
+    if(a > b)
+        return 1;
+    return 0;
+}
+
+arith_uint256 BN_set_negative(arith_uint256 value, int sign)
+{
+    if(value<0 && sign)
+    {
+        return value;
+    }
+    else
+    {
+        return -1 * value;
+    }
+}
+
+arith_uint256 nthRoot(const arith_uint256& value, int n)
+{
+    assert(n > 1);
+    if (value==0)
+        return 0;
+    assert(value>0);
+
+    // starting approximation
+    int nRootBits = (value.bits() + n - 1) / n;
+    int nStartingBits = std::min(8, nRootBits);
+    arith_uint256 bnUpper = value;
+    bnUpper >>= (nRootBits - nStartingBits)*n;
+    arith_uint256 bnCur = 0;
+    for (int i = nStartingBits - 1; i >= 0; i--)
+    {
+        arith_uint256 bnNext = bnCur;
+        bnNext += 1 << i;
+        arith_uint256 bnPower(1);
+        for (int j = 0; j < n; j++)
+            bnPower *= bnNext;
+        if (BN_cmp(bnPower, bnUpper) <= 0)
+            bnCur = bnNext;
+    }
+    if (nRootBits == nStartingBits)
+        return bnCur;
+    bnCur <<= nRootBits - nStartingBits;
+
+    // iterate: cur = cur + (*this / cur^^(n-1) - cur)/n
+    arith_uint256 bnDelta;
+    arith_uint256 bnRoot(n);
+    int nTerminate = 0;
+    // this should always converge in fewer steps, but limit just in case
+    for (int it = 0; it < 20; it++)
+    {
+        arith_uint256 bnDenominator = 1;
+        for (int i = 0; i < n - 1; i++)
+            bnDenominator *= bnCur;
+        bnDelta = value / bnDenominator - bnCur;
+        if (bnDelta.EqualTo(0))
+            return bnCur;
+        if (bnDelta<0)
+        {
+            if (nTerminate == 1)
+                return bnCur - 1;
+            bnDelta = BN_set_negative(bnDelta, 0);
+            if (BN_cmp(bnDelta, bnRoot) <= 0)
+            {
+                bnCur -= 1;
+                nTerminate = -1;
+                continue;
+            }
+            bnDelta = BN_set_negative(bnDelta, 1);
+        }
+        else
+        {
+            if (nTerminate == -1)
+                return bnCur;
+            if (BN_cmp(bnDelta, bnRoot) <= 0)
+            {
+                bnCur += 1;
+                nTerminate = 1;
+                continue;
+            }
+        }
+        bnCur += bnDelta / n;
+        nTerminate = 0;
+    }
+    return bnCur;
+}
